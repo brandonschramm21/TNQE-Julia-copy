@@ -863,7 +863,7 @@ function TwoSiteBlockSweep!(
                     T_new = T_list[j]*sdata.phi_list[j][p+1]
                     
                     # Replace the tensors of the MPS:
-                    spec = ITensors.replacebond!(
+                    spec = ITensorMPS.replacebond!(
                         sdata.phi_list[j],
                         p,
                         T_new;
@@ -884,13 +884,13 @@ function TwoSiteBlockSweep!(
                     T_new = sdata.phi_list[j][p]*sdata.phi_list[j][p+1]
 
                     # Generate the DMRG "noise" term:
-                    pmpo = ITensors.ProjMPO(sdata.H_mpo)
-                    ITensors.set_nsite!(pmpo,2)
-                    ITensors.position!(pmpo, sdata.phi_list[j], p)
-                    drho = op.noise[1]*ITensors.noiseterm(pmpo,T_new,"left")
+                    pmpo = ITensorMPS.ProjMPO(sdata.H_mpo)
+                    ITensorMPS.set_nsite!(pmpo,2)
+                    ITensorMPS.position!(pmpo, sdata.phi_list[j], p)
+                    drho = op.noise[1]*ITensorMPS.noiseterm(pmpo,T_new,"left")
 
                     # Replace the tensors of the MPS:
-                    spec = ITensors.replacebond!(
+                    spec = ITensorMPS.replacebond!(
                         sdata.phi_list[j],
                         p,
                         T_new;
@@ -925,7 +925,7 @@ function TwoSiteBlockSweep!(
 
                         T_j = sdata.phi_list[j][p]*sdata.phi_list[j][p+1]
 
-                        spec = ITensors.replacebond!(
+                        spec = ITensorMPS.replacebond!(
                             sdata.phi_list[j],
                             p,
                             T_j;

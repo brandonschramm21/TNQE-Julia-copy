@@ -1,7 +1,7 @@
 # Functions for constructing (and modifying) the subspace data structure
 
 # Packages:
-using ITensors
+using ITensors, ITensorMPS
 using HDF5
 import Base: copy
 
