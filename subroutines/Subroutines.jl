@@ -33,12 +33,14 @@ include("./Optimizer.jl")
 
 # Import Python modules, including the RunPySCF subroutines in Python in order to use PySCF:
 py"""
+import platform
+print(platform.python_version())
 import sys
 import os
 import configparser
 wd = os.getcwd()
-sys.path.append(wd+'/subroutines/')
-#import RunPySCF
-import platform
-print(platform.python_version())
+sys.path.append(wd+'/../subroutines/')
+import RunPySCF
+
+
 """

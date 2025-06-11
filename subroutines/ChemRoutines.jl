@@ -47,16 +47,69 @@ function Spatial2SpinOrd(spt_ord)
     return spn_ord 
 end
 
+function UHFOpSum(chem_data, ord; tol=1e-14)
+    
+    #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
+    N_spt = chem_data.N_spt
+    h1e_a = chem_data.h1e_a
+    h2e_b = chem_data.h2e_b
+    
+    ampo = OpSum()
+    #correctly order the hamiltonian information - [alph_virt, alph_occ, beta_occ, beta_virt]
+    quarter = Int(N_spt/4)
+    H6_site_order = [6,5,4,1,2,3]
+    for p=1:N_spt, q=1:N_spt
+
+        if p<=quarter
+            cf = h1e_a[ord[N_spt-p],ord[q]]
+        elseif p<=2*quarter
+            cf = h1e_a[ord[p],ord[q]] - h1e_b[ord[p-quarter],ord[q-quarter]]
+        elseif p<=3*quarter
+            cf = h1e_b[ord[p-2*quarter],ord[q-2*quarter]]
+        else
+            cf = h1e_b[ord[p-3*quarter],ord[q-3*quarter]] - h1e_a[ord[p-quarter],ord[q-quarter]]
+        end
+
+        if abs(cf) >= tol
+            ampo += cf,"c†↑",p,"c↑",q
+            ampo += cf,"c†↓",p,"c↓",q
+        end
+        
+    end
+
+    for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
+        
+        cf = 0.5*h2e[ord[p],ord[q],ord[r],ord[s]]
+        
+        if abs(cf) >= tol
+            ampo += cf,"c†↑",p,"c†↓",r,"c↓",s,"c↑",q
+            ampo += cf,"c†↓",p,"c†↑",r,"c↑",s,"c↓",q
+            if p!=r && s!=q
+                ampo += cf,"c†↓",p,"c†↓",r,"c↓",s,"c↓",q
+                ampo += cf,"c†↑",p,"c†↑",r,"c↑",s,"c↑",q
+            end
+        end
+    end
+    
+    return ampo
+
+end
+
+
+
 
 # Generate the OpSum object from the Hamiltonian coefficients:
 function GenOpSum(chem_data, ord; tol=1e-14)
     
+    #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
     N_spt = chem_data.N_spt
     h1e = chem_data.h1e
     h2e = chem_data.h2e
     
-    ampo = OpSum()
+    
 
+    ampo = OpSum()
+    #for each site
     for p=1:N_spt, q=1:N_spt
         
         cf = h1e[ord[p],ord[q]]
@@ -236,8 +289,9 @@ end
 function FCIArray(chem_data; sign_vec=nothing)
     
     fci_vec = chem_data.fci_vec
-    fci_str = chem_data.fci_str
-    fci_addr = chem_data.fci_addr
+    fci_str = chem_data.fci_str_a
+    fci_str = append!(fci_str,chem_data.fci_str_b)
+    fci_addr = chem_data.fci_addr_a
     N = chem_data.N
     N_spt = chem_data.N_spt
     N_el = chem_data.N_el
@@ -255,7 +309,7 @@ function FCIArray(chem_data; sign_vec=nothing)
     
     blen = length(fci_str)
     
-    for (da, str_a) in enumerate(fci_str), (db, str_b) in enumerate(fci_str)
+    for (da, str_a) in enumerate(chem_data.fci_str_a), (db, str_b) in enumerate(chem_data.fci_str_b)
         
         a_index = reverse(parse.( Int, split(lpad(str_a[3:end], N_spt,"0"), "") ) .+ 1)
         b_index = reverse(parse.( Int, split(lpad(str_b[3:end], N_spt,"0"), "") ) .+ 1)

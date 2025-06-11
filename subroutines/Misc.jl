@@ -7,7 +7,7 @@ function PrintChemData(chemical_data)
     println("Molecule name: ", chemical_data.mol_name)
     println("Basis set: ", chemical_data.basis)
     println("Molecular geometry: ", chemical_data.geometry)
-    println("RHF energy: ", chemical_data.e_rhf)
+    println("XHF energy: ", chemical_data.e_xhf)
     println("FCI energy: ", chemical_data.e_fci)
 end
 

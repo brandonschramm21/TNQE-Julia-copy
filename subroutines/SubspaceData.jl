@@ -108,7 +108,8 @@ function GenSubspace(
     
     verbose && println("\nGenerating Hamiltonian MPO:")
     
-    opsum = GenOpSum(chem_data, init_ord)
+    #opsum = GenOpSum(chem_data, init_ord)
+    opsum = UHFOpSum(chem_data, init_ord);
     H_mpo = MPO(opsum, sites, cutoff=ham_tol, maxdim=ham_maxdim)
     
     verbose && println("Done!\n")
