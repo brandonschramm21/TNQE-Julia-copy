@@ -48,47 +48,54 @@ function Spatial2SpinOrd(spt_ord)
 end
 
 function UHFOpSum(chem_data, ord; tol=1e-14)
-    
+    #EVERYTHING IS HARD CODED FOR H6 FIX BEFORE DOINGN ANYTHING
+    #to generalize - need total length variable
     #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
     N_spt = chem_data.N_spt
+
     h1e_a = chem_data.h1e_a
-    h2e_b = chem_data.h2e_b
+    h1e_b = chem_data.h1e_b
     
+    h2e_aa = chem_data.h2e_aa
+    h2e_bb = chem_data.h2e_bb
+    h2e_ab = chem_data.h2e_ab
+
+
+
     ampo = OpSum()
     #correctly order the hamiltonian information - [alph_virt, alph_occ, beta_occ, beta_virt]
-    quarter = Int(N_spt/4)
-    H6_site_order = [6,5,4,1,2,3]
+
+    
     for p=1:N_spt, q=1:N_spt
+        cf_a = h1e_a[ord[p],ord[q]]
+        cf_b = h1e_b[ord[p],ord[q]]
 
-        if p<=quarter
-            cf = h1e_a[ord[N_spt-p],ord[q]]
-        elseif p<=2*quarter
-            cf = h1e_a[ord[p],ord[q]] - h1e_b[ord[p-quarter],ord[q-quarter]]
-        elseif p<=3*quarter
-            cf = h1e_b[ord[p-2*quarter],ord[q-2*quarter]]
-        else
-            cf = h1e_b[ord[p-3*quarter],ord[q-3*quarter]] - h1e_a[ord[p-quarter],ord[q-quarter]]
+        if abs(cf_a) >= tol
+            ampo += cf_a,"c†↑",p,"c↑",q
         end
 
-        if abs(cf) >= tol
-            ampo += cf,"c†↑",p,"c↑",q
-            ampo += cf,"c†↓",p,"c↓",q
+        if abs(cf_b) >= tol
+            ampo += cf_b,"c†↓",13-p,"c↓",13-q
         end
-        
     end
 
     for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
         
-        cf = 0.5*h2e[ord[p],ord[q],ord[r],ord[s]]
-        
-        if abs(cf) >= tol
-            ampo += cf,"c†↑",p,"c†↓",r,"c↓",s,"c↑",q
-            ampo += cf,"c†↓",p,"c†↑",r,"c↑",s,"c↓",q
-            if p!=r && s!=q
-                ampo += cf,"c†↓",p,"c†↓",r,"c↓",s,"c↓",q
-                ampo += cf,"c†↑",p,"c†↑",r,"c↑",s,"c↑",q
-            end
+        cf_aa = 0.5*h2e_aa[ord[p],ord[q],ord[r],ord[s]]
+        cf_bb = 0.5*h2e_bb[ord[p],ord[q],ord[r],ord[s]]
+        cf_ab = 0.5*h2e_ab[ord[p],ord[q],ord[r],ord[s]]
+
+        if abs(cf_aa) >= tol && p!=r && s!=q
+                
+                ampo += cf_aa,"c†↑",p,"c†↑",r,"c↑",s,"c↑",q
+            
         end
+        if abs(cf_bb)>=tol && p!=r && s!=q
+            ampo += cf_bb,"c†↓",13-p,"c†↓",13-r,"c↓",13-s,"c↓",13-q
+        end
+        if abs(cf_ab)>=tol
+            ampo += cf_ab,"c†↑",p,"c†↓",13-r,"c↓",13-s,"c↑",q
+            ampo += cf_ab,"c†↓",p,"c†↑",r,"c↑",s,"c↓",q
     end
     
     return ampo
