@@ -51,7 +51,7 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
     #EVERYTHING IS HARD CODED FOR H6 FIX BEFORE DOINGN ANYTHING
     #to generalize - need total length variable
     #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
-    N_spt = chem_data.N_spt
+    N_spt = 6
 
     h1e_a = chem_data.h1e_a
     h1e_b = chem_data.h1e_b
@@ -95,7 +95,8 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
         end
         if abs(cf_ab)>=tol
             ampo += cf_ab,"c†↑",p,"c†↓",13-r,"c↓",13-s,"c↑",q
-            ampo += cf_ab,"c†↓",p,"c†↑",r,"c↑",s,"c↓",q
+            ampo += cf_ab,"c†↓",13-p,"c†↑",r,"c↑",s,"c↓",13-q
+        end
     end
     
     return ampo

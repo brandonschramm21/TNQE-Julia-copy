@@ -66,7 +66,7 @@ function GenSubspace(
         ovlp_weight=2.0,
         verbose=false
     )
-    
+
     # Default metaparameters:
     mparams = MetaParameters(
         M,
@@ -78,7 +78,7 @@ function GenSubspace(
         thresh,
         eps
     )
-    
+
     # Default sites:
     if sites == nothing
         if stype=="Electron"
@@ -91,7 +91,7 @@ function GenSubspace(
             println("Invalid site type!")
         end
     end
-    
+
     # Default sweeps:
     if dflt_sweeps == nothing
         dflt_sweeps = Sweeps(sweep_num)
@@ -100,7 +100,7 @@ function GenSubspace(
         #cutoff!(dflt_sweeps,mps_tol)
         setnoise!(dflt_sweeps, sweep_noise...)
     end
-    
+
     # Generate the Hamiltonian:
     if init_ord==nothing
         init_ord = collect(1:chem_data.N_spt)
@@ -111,22 +111,24 @@ function GenSubspace(
     #opsum = GenOpSum(chem_data, init_ord)
     opsum = UHFOpSum(chem_data, init_ord);
     H_mpo = MPO(opsum, sites, cutoff=ham_tol, maxdim=ham_maxdim)
-    
+    println(chem_data.N_spt)
     verbose && println("Done!\n")
+
     verbose && println("\nGenerating Hamiltonian sparse matrix:")
     
     H_tens = reduce(*, H_mpo);
+    println("1")
     mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites])
-    
+    println("2")
     H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (4^chem_data.N_spt,4^chem_data.N_spt)))
-    
+    println("3")
     # Project onto the eta-subspace to save on computation:
     eta_vec = sparse(zeros(4^chem_data.N_spt))
     for b=1:4^chem_data.N_spt
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
     eta_proj = sparse(diagm(eta_vec))
-    
+    println("4")
     H_sparse = eta_proj * H_sparse * eta_proj
     
     #H_sparse, eta_proj = HMatrix(chemical_data)
