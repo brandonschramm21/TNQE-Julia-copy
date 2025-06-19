@@ -3,7 +3,8 @@
 
 # Solve the generalized eigenvalue problem HC = SCE with a given thresholding procedure:
 function SolveGenEig(H_in, S_in; thresh="none", eps=1e-12, force_posdef=false)
-    
+    print(H_in, "\n")
+    print(S_in, "\n")
     H = Hermitian(H_in)
     S = Hermitian(S_in)
     M = size(S,1)

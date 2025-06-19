@@ -23,7 +23,7 @@ end
 # ...including molecular data, metaparameters, orderings, \\
 # ...generated MPSs and MPOs, and subspace diag. results.
 mutable struct SubspaceProperties
-    chem_data::ChemProperties
+    chem_data::ChemPropertiesUHF
     mparams::MetaParameters
     sites::Vector
     dflt_sweeps::Sweeps
@@ -117,18 +117,17 @@ function GenSubspace(
     verbose && println("\nGenerating Hamiltonian sparse matrix:")
     
     H_tens = reduce(*, H_mpo);
-    println("1")
+    println("Matrix Reduced")
     mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites])
-    println("2")
+    
     H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (4^chem_data.N_spt,4^chem_data.N_spt)))
-    println("3")
     # Project onto the eta-subspace to save on computation:
     eta_vec = sparse(zeros(4^chem_data.N_spt))
     for b=1:4^chem_data.N_spt
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
     eta_proj = sparse(diagm(eta_vec))
-    println("4")
+    println("Sparse matrix constructed")
     H_sparse = eta_proj * H_sparse * eta_proj
     
     #H_sparse, eta_proj = HMatrix(chemical_data)

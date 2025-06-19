@@ -51,21 +51,22 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
     #EVERYTHING IS HARD CODED FOR H6 FIX BEFORE DOINGN ANYTHING
     #to generalize - need total length variable
     #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
-    N_spt = 6
-
+    N_spt = convert(Int64,chem_data.N_spt/2)
+    MPO_len = 2*N_spt
+    print(N_spt)
     h1e_a = chem_data.h1e_a
     h1e_b = chem_data.h1e_b
     
     h2e_aa = chem_data.h2e_aa
     h2e_bb = chem_data.h2e_bb
     h2e_ab = chem_data.h2e_ab
-
+    print(size(h2e_ab))
 
 
     ampo = OpSum()
     #correctly order the hamiltonian information - [alph_virt, alph_occ, beta_occ, beta_virt]
 
-    
+    #adding one body terms: h_{pq} adag_p a_q
     for p=1:N_spt, q=1:N_spt
         cf_a = h1e_a[ord[p],ord[q]]
         cf_b = h1e_b[ord[p],ord[q]]
@@ -75,10 +76,12 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
         end
 
         if abs(cf_b) >= tol
-            ampo += cf_b,"c†↓",13-p,"c↓",13-q
+            ampo += cf_b,"c†↓",MPO_len-p,"c↓",MPO_len-q
         end
     end
+    
 
+    #adding two body terms: h_{pqrs} adag_p a_r adag_s a_q
     for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
         
         cf_aa = 0.5*h2e_aa[ord[p],ord[q],ord[r],ord[s]]
@@ -91,11 +94,11 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
             
         end
         if abs(cf_bb)>=tol && p!=r && s!=q
-            ampo += cf_bb,"c†↓",13-p,"c†↓",13-r,"c↓",13-s,"c↓",13-q
+            ampo += cf_bb,"c†↓",MPO_len-p,"c†↓",MPO_len-r,"c↓",MPO_len-s,"c↓",MPO_len-q
         end
         if abs(cf_ab)>=tol
-            ampo += cf_ab,"c†↑",p,"c†↓",13-r,"c↓",13-s,"c↑",q
-            ampo += cf_ab,"c†↓",13-p,"c†↑",r,"c↑",s,"c↓",13-q
+            ampo += cf_ab,"c†↑",p,"c†↓",MPO_len-r,"c↓",MPO_len-s,"c↑",q
+            ampo += cf_ab,"c†↓",MPO_len-p,"c†↑",r,"c↑",s,"c↓",MPO_len-q
         end
     end
     

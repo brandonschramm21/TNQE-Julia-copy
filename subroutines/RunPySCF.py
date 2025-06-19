@@ -21,7 +21,7 @@ def RunPySCF(config, gen_cubes=False, nosec=False):
     mol_charge = config['MOLECULE PROPERTIES'].getint('mol_charge', fallback=0)
     basis = config['CALCULATION PARAMETERS']['basis']
     run_rohf = config['CALCULATION PARAMETERS'].getboolean('run_rohf', fallback=False)
-    run_uhf = config['CALCULATION PARAMETERS'].getboolean('run_uhf', fallback=True)
+    run_uhf = config['CALCULATION PARAMETERS'].getboolean('run_uhf', fallback=False)
     init_hispin = config['CALCULATION PARAMETERS'].getboolean('init_hispin', fallback=False)
     init_prev = config['CALCULATION PARAMETERS'].getboolean('init_prev', fallback=False)
     run_fci = config['CALCULATION PARAMETERS'].getboolean('run_fci', fallback=False)
