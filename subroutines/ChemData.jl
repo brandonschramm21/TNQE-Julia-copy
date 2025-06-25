@@ -50,9 +50,7 @@ end
 
 # Read in the chemical data from the HDF5 directory:
 function ReadIn(fname; uhf::Bool=false)
-    
     fid = h5open(fname, "r")
-    
     mol_name = read(fid, "mol_name")
     basis = read(fid, "basis")
     geometries = read(fid, "geometries")

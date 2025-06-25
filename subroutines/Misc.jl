@@ -38,9 +38,9 @@ function DisplayEvalData(sdata)
     kappa_list = EigCondNums(E, C)
     println("Eigenvalue condition numbers: ", round.(kappa_list, digits=4))
     
-    e_corr = chemical_data.e_fci-chemical_data.e_rhf
-    e_corr_dmrg = e_bsrf - chemical_data.e_rhf
-    e_corr_tnqe = e_gnd - chemical_data.e_rhf
+    e_corr = chemical_data.e_fci-chemical_data.e_xhf
+    e_corr_dmrg = e_bsrf - chemical_data.e_xhf
+    e_corr_tnqe = e_gnd - chemical_data.e_xhf
     pctg_dmrg = e_corr_dmrg/e_corr*100
     pctg_tnqe = e_corr_tnqe/e_corr*100
     println("Percent correlation energy with single-geometry DMRG: $pctg_dmrg")
