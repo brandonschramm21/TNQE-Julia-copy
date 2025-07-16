@@ -61,11 +61,7 @@ def RunPySCF(config, gen_cubes=False, nosec=False):
             print(geometry)
             #print(os.path.isfile(geometry))
             
-            mol_obj = pyscf.gto.M(atom=geometry, basis=basis)
-            mol_obj.basis = basis
-            mol_obj.charge = mol_charge
-            mol_obj.spin = mol_spin
-            
+            mol_obj = pyscf.gto.M(atom=geometry, basis=basis, spin=mol_spin,charge = mol_charge)
             
 
             #RUNNING SELECTED SCF - more advanced options in RHF, implement to UHF as needed. --------------
