@@ -48,35 +48,46 @@ function Spatial2SpinOrd(spt_ord)
 end
 
 function UHFOpSum(chem_data, ord; tol=1e-14)
-    #EVERYTHING IS HARD CODED FOR H6 FIX BEFORE DOINGN ANYTHING
-    #to generalize - need total length variable
+    #Should be general for any ordering
     #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
+    non_zeros = 0
     N_spt = convert(Int64,chem_data.N_spt/2)
     MPO_len = 2*N_spt
-    print(N_spt)
+    #indices needed to properly treat arbitrart ordering
+    alpha_indices = Dict{Int,Int}(ord[i] => i for i = 1:N_spt*2 if ord[i] <= N_spt)
+    beta_indices = Dict{Int,Int}(ord[i]-N_spt => i for i = 1:N_spt*2 if ord[i] > N_spt)
+    println(alpha_indices)
+    println(beta_indices)
     h1e_a = chem_data.h1e_a
     h1e_b = chem_data.h1e_b
     
     h2e_aa = chem_data.h2e_aa
     h2e_bb = chem_data.h2e_bb
     h2e_ab = chem_data.h2e_ab
-    print(size(h2e_ab))
+    h2e_ba = chem_data.h2e_ba
+    println(size(h2e_ab))
 
 
     ampo = OpSum()
     #correctly order the hamiltonian information - [alph_virt, alph_occ, beta_occ, beta_virt]
 
+    #HOMO_matching => HOMOs in middle
+
     #adding one body terms: h_{pq} adag_p a_q
     for p=1:N_spt, q=1:N_spt
-        cf_a = h1e_a[ord[p],ord[q]]
-        cf_b = h1e_b[ord[p],ord[q]]
+        cf_a = h1e_a[p,q]
+        cf_b = h1e_b[p,q]
 
         if abs(cf_a) >= tol
-            ampo += cf_a,"c†↑",p,"c↑",q
+            ampo += cf_a,"c†↑",alpha_indices[p],"c↑",alpha_indices[q]
+            #display("added the h1e_a electron value of " * string(cf_a) *" to sites"*string(alpha_indices[p])*" "*string(alpha_indices[q]))
+            non_zeros+=1
         end
 
         if abs(cf_b) >= tol
-            ampo += cf_b,"c†↓",MPO_len-p,"c↓",MPO_len-q
+            ampo += cf_b,"c†↓",beta_indices[p],"c↓",beta_indices[q]
+            #display("added the h1e_b electron value of " *string(cf_b) *" to sites"*string(beta_indices[p])*" "*string(beta_indices[q]))
+            non_zeros+=1
         end
     end
     
@@ -84,24 +95,33 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
     #adding two body terms: h_{pqrs} adag_p a_r adag_s a_q
     for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
         
-        cf_aa = 0.5*h2e_aa[ord[p],ord[q],ord[r],ord[s]]
-        cf_bb = 0.5*h2e_bb[ord[p],ord[q],ord[r],ord[s]]
-        cf_ab = 0.5*h2e_ab[ord[p],ord[q],ord[r],ord[s]]
+        cf_aa = 0.5*h2e_aa[p,q,r,s]
+        cf_bb = 0.5*h2e_bb[p,q,r,s]
+        cf_ab = h2e_ab[p,q,r,s]
+        cf_ba = h2e_ba[p,q,r,s]
 
-        if abs(cf_aa) >= tol && p!=r && s!=q
-                
-                ampo += cf_aa,"c†↑",p,"c†↑",r,"c↑",s,"c↑",q
-            
+        if abs(cf_aa) >= tol
+            ampo += cf_aa,"c†↑",alpha_indices[p],"c†↑",alpha_indices[q],"c↑",alpha_indices[s],"c↑",alpha_indices[r]
+            #display("added the h2e_aa electron value of " *string(cf_aa) *" to sites "*string(alpha_indices[p])*" "*string(alpha_indices[q])*" "*string(alpha_indices[r])*" "*string(alpha_indices[s]))
+            non_zeros+=1
         end
-        if abs(cf_bb)>=tol && p!=r && s!=q
-            ampo += cf_bb,"c†↓",MPO_len-p,"c†↓",MPO_len-r,"c↓",MPO_len-s,"c↓",MPO_len-q
+        if abs(cf_bb)>=tol
+            ampo += cf_bb,"c†↓",beta_indices[p],"c†↓",beta_indices[q],"c↓",beta_indices[s],"c↓",beta_indices[r]
+            #display("added the h2e_bb electron value of " *string(cf_bb) *" to sites "*string(beta_indices[p])*" "*string(beta_indices[q])*" "*string(beta_indices[r])*" "*string(beta_indices[s]))
+            non_zeros+=1
         end
         if abs(cf_ab)>=tol
-            ampo += cf_ab,"c†↑",p,"c†↓",MPO_len-r,"c↓",MPO_len-s,"c↑",q
-            ampo += cf_ab,"c†↓",MPO_len-p,"c†↑",r,"c↑",s,"c↓",MPO_len-q
+            ampo += cf_ab,"c†↑",alpha_indices[p],"c†↓",beta_indices[q],"c↓",beta_indices[s],"c↑",alpha_indices[r]
+            #display("added the h2e_ab electron value of " *string(cf_ab) *" to sites "*string(alpha_indices[p])*" "*string(beta_indices[q])*" "*string(alpha_indices[r])*" "*string(beta_indices[s]))
+            non_zeros+=1
+        end
+        if abs(cf_ba)>=tol
+            #display("added the h2e_ba electron value of " *string(cf_ba) *" to sites "*string(beta_indices[p])*" "*string(alpha_indices[q])*" "*string(beta_indices[r])*" "*string(alpha_indices[s]))
+            ampo += cf_ba,"c†↓",beta_indices[p],"c†↑",alpha_indices[q],"c↑",alpha_indices[s],"c↓",beta_indices[r]
+            non_zeros+=1
         end
     end
-    
+    display("Number of non-zero terms in the OpSum: " * string(non_zeros))
     return ampo
 
 end

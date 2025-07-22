@@ -41,6 +41,7 @@ mutable struct ChemPropertiesUHF
     h2e_aa
     h2e_bb
     h2e_ab
+    h2e_ba
     t2
     e_mo
     N_el::Int
@@ -85,6 +86,7 @@ function ReadIn(fname; uhf::Bool=false)
             h2e_aa = read(grp, "h2e_aa")
             h2e_bb = read(grp, "h2e_bb")
             h2e_ab = read(grp, "h2e_ab")
+            h2e_ba = read(grp, "h2e_ba")
             t2 = read(grp, "t2")
             e_mo = read(grp, "e_mo")
             N_el = read(grp, "nel")
@@ -105,7 +107,7 @@ function ReadIn(fname; uhf::Bool=false)
         N_spt = size(vcat(h1e_a,h1e_b), 1)
         N = 2*N_spt
         if uhf
-            new_cdata = ChemPropertiesUHF(mol_name, basis, geometry, e_xhf, uhf_mos, e_fci, fci_vec, alpha_occ_string, beta_occ_string, fci_str_a,fci_str_b, fci_addr_a,fci_addr_b, e_nuc, h1e_a,h1e_b, h2e_aa,h2e_bb,h2e_ab, t2, e_mo, N_el, N, N_spt)
+            new_cdata = ChemPropertiesUHF(mol_name, basis, geometry, e_xhf, uhf_mos, e_fci, fci_vec, alpha_occ_string, beta_occ_string, fci_str_a,fci_str_b, fci_addr_a,fci_addr_b, e_nuc, h1e_a,h1e_b, h2e_aa,h2e_bb,h2e_ab, h2e_ba, t2, e_mo, N_el, N, N_spt)
         else
             new_cdata = ChemProperties(mol_name, basis, geometry, e_xhf, e_fci, fci_vec, fci_str, fci_addr, e_nuc, h1e, h2e, t2, e_mo, N_el, N, N_spt)
         end

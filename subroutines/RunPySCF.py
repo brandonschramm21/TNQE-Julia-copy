@@ -232,6 +232,9 @@ def RunPySCF(config, gen_cubes=False, nosec=False):
                     # For alpha-beta spin block
                     h2e_ab = ao2mo.general(h2e, (C_alpha, C_alpha, C_beta, C_beta))  # (ij|ab)
 
+                    # For beta-alpha spin block
+                    h2e_ba = ao2mo.general(h2e, (C_beta, C_beta, C_alpha, C_alpha))
+
                 else:
                     scf_c = rhf_obj.mo_coeff
             
@@ -270,6 +273,7 @@ def RunPySCF(config, gen_cubes=False, nosec=False):
                 h2e_aa_data = grp.create_dataset("h2e_aa", data=h2e_aa)
                 h2e_bb_data = grp.create_dataset("h2e_bb", data=h2e_bb)
                 h2e_ab_data = grp.create_dataset("h2e_ab", data=h2e_ab)
+                h2e_ba_data = grp.create_dataset("h2e_ba", data=h2e_ba)
             else:
                 h1e_data = grp.create_dataset("h1e", data=h1e)
                 h2e_data = grp.create_dataset("h2e", data=h2e)

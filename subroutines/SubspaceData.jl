@@ -43,6 +43,7 @@ end
 # Generates a subspace properties struct instance (with modifiable defaults):
 function GenSubspace(
         chem_data;
+        constructed_mps=nothing,
         M=1,
         stype="Electron",
         init_ord=nothing,
@@ -64,6 +65,7 @@ function GenSubspace(
         dmrg_init=true,
         ovlp_opt=false,
         ovlp_weight=2.0,
+        uhf=false,
         verbose=false
     )
 
@@ -79,6 +81,8 @@ function GenSubspace(
         eps
     )
 
+    # Determine sites:
+    num_sites = chem_data.N_spt
     # Default sites:
     if sites == nothing
         if stype=="Electron"
@@ -103,27 +107,31 @@ function GenSubspace(
 
     # Generate the Hamiltonian:
     if init_ord==nothing
-        init_ord = collect(1:chem_data.N_spt)
+        init_ord = collect(1:num_sites)
     end
     
     verbose && println("\nGenerating Hamiltonian MPO:")
     
     #opsum = GenOpSum(chem_data, init_ord)
-    opsum = UHFOpSum(chem_data, init_ord);
+    if uhf
+        opsum = UHFOpSum(chem_data, init_ord);
+    else
+        opsum = OpSum(chem_data, init_ord);
+    end
     H_mpo = MPO(opsum, sites, cutoff=ham_tol, maxdim=ham_maxdim)
-    println(chem_data.N_spt)
-    verbose && println("Done!\n")
-
+    
+    verbose && println("Done making MPO hamiltonian!\n")
+    display(H_mpo)
     verbose && println("\nGenerating Hamiltonian sparse matrix:")
     
     H_tens = reduce(*, H_mpo);
     println("Matrix Reduced")
     mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites])
     
-    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (4^chem_data.N_spt,4^chem_data.N_spt)))
+    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (4^num_sites,4^num_sites)))
     # Project onto the eta-subspace to save on computation:
-    eta_vec = sparse(zeros(4^chem_data.N_spt))
-    for b=1:4^chem_data.N_spt
+    eta_vec = sparse(zeros(4^num_sites))
+    for b=1:4^num_sites
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
     eta_proj = sparse(diagm(eta_vec))
@@ -132,20 +140,26 @@ function GenSubspace(
     
     #H_sparse, eta_proj = HMatrix(chemical_data)
     
-    #display(H_sparse)
+    display(H_sparse)
     
     verbose && println("Done!\n")
     
     # Generate initial matrix product states:
     phi_list = MPS[]
-    hf_occ = [FillHF(init_ord[p], chem_data.N_el) for p=1:chem_data.N_spt]
+    hf_occ = [FillHF(init_ord[p], chem_data.N_el) for p=1:num_sites]
     
     verbose && println("\nGenerating states:")
     
     for i=1:M
-        push!(phi_list, randomMPS(sites, hf_occ, linkdims=mps_maxdim))
+        if isnothing(constructed_mps)
+            push!(phi_list, randomMPS(sites, hf_occ, linkdims=mps_maxdim))
+        else
+            push!(phi_list, constructed_mps)
+        end
     end
-    
+    println("HF OCC below")
+    display(hf_occ)
+    display(phi_list[1])
     if dmrg_init
         for i=1:M
             if ovlp_opt && i > 1
