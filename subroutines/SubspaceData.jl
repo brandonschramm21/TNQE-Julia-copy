@@ -82,7 +82,7 @@ function GenSubspace(
     )
 
     # Determine sites:
-    num_sites = chem_data.N_spt
+    num_sites = chem_data.N_spt*2
     # Default sites:
     if sites == nothing
         if stype=="Electron"
@@ -128,10 +128,10 @@ function GenSubspace(
     println("Matrix Reduced")
     mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites])
     
-    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (4^num_sites,4^num_sites)))
+    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
     # Project onto the eta-subspace to save on computation:
-    eta_vec = sparse(zeros(4^num_sites))
-    for b=1:4^num_sites
+    eta_vec = sparse(zeros(2^num_sites))
+    for b=1:2^num_sites
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
     eta_proj = sparse(diagm(eta_vec))
