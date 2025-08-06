@@ -132,17 +132,14 @@ function GenSubspace(
     H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
     
     
-<<<<<<< HEAD
-    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
-    # Project onto the eta-subspace to save on computation:
-    eta_vec = sparse(zeros(2^num_sites))
-=======
-    # Project onto the eta-subspace to save on computation:
 
+    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
+
+    # Project onto the eta-subspace to save on computation:
     eta_vec = sparse(zeros(2^num_sites))
-    #selecting for bitstrings with the correct number of electrons
->>>>>>> e589d2f (moderately functional "fermion" sitetype operational)
+    
     for b=1:2^num_sites
+
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
     eta_proj = sparse(diagm(eta_vec))
