@@ -68,7 +68,7 @@ function SparseVecOHT(phi, p, nsite, oht)
     else
         phi_tens = reduce(*, phi);
     end
-    phi_vec = sparse(reshape(Array(phi_tens, siteinds(phi)), (4^length(phi))))
+    phi_vec = sparse(reshape(Array(phi_tens, siteinds(phi)), (2^length(phi))))
     return phi_vec
 end
 
@@ -528,7 +528,8 @@ function TwoSiteBlockSweep!(
             oht_list = []
             oht_vecs = []
             oht_hvecs = []
-            
+            #display(sdata.G_list)
+            #display(sdata.phi_list)
             for i=1:M
                 if nsite[i]==0
                     push!(T_tensor_list, ITensor(1.0))
@@ -744,7 +745,7 @@ function TwoSiteBlockSweep!(
                 
                 if rotype=="fswap"
                     # Revert to non-optimized starting guess (with FSWAPs applied):
-                    fswap = RotationTensor(sdata.sites, p; dim=4, rotype="fswap")
+                    fswap = RotationTensor(sdata.sites, p; dim=4, rotype="fswap", verbose=true)
                     for i=1:M
                         if do_swaps[i]
                             T_tensor_list[i] *= fswap 
@@ -754,7 +755,7 @@ function TwoSiteBlockSweep!(
                 elseif rotype=="givens"
                     # Revert to non-optimized starting guess (with Givens rotations applied):
                     for i=1:M
-                        grot = RotationTensor(sdata.sites, p; dim=4, rotype="givens", theta=theta_opt[i]);
+                        grot = RotationTensor(sdata.sites, p; dim=4, rotype="givens", theta=theta_opt[i], verbose=true);
                         T_tensor_list[i] *= grot
                         noprime!(T_tensor_list[i], tags="Site")
                     end
@@ -798,10 +799,12 @@ function TwoSiteBlockSweep!(
                                           0 1 0 0;
                                           0 0 1 0;
                                           0 0 0 1])
-                            
-                            rmat = sparse(RotationMatrix(dim=4, rotype="fswap"))
-
-                            sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_4 for q=1:p-1],[rmat],[I_4 for q=p+2:N]])))
+                            I_2 = sparse([1 0;
+                                          0 1])
+                            #eeks
+                            rmat = sparse(RotationMatrix(dim=2, rotype="fswap"))
+                            sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_2 for q=1:p-1],[rmat],[I_2 for q=p+2:N]])))
+                            #sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_4 for q=1:p-1],[rmat],[I_4 for q=p+2:N]])))
                         end
                     end
                     
@@ -816,10 +819,14 @@ function TwoSiteBlockSweep!(
                                           0 1 0 0;
                                           0 0 1 0;
                                           0 0 0 1])
-
-                            rmat = sparse(RotationMatrix(dim=4, rotype="givens", theta=theta_opt[j]))
-                            
-                            sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_4 for q=1:p-1],[rmat],[I_4 for q=p+2:N]])))
+                            I_2 = sparse([1 0;
+                                          0 1])
+                            rmat = sparse(RotationMatrix(dim=2, rotype="givens", theta=theta_opt[j]))
+                            #eeks
+                            #unironically, this code takes the two-site givens matrix and
+                            #makes a form that can merge with the overall giant Givens rotation unitary
+                            sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_2 for q=1:p-1],[rmat],[I_2 for q=p+2:N]])))
+                            #sdata.G_list[j] *= reduce(kron, reverse(reduce(vcat, [[I_4 for q=1:p-1],[rmat],[I_4 for q=p+2:N]])))
                         end
                     end
 

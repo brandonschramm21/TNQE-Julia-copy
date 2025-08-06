@@ -101,6 +101,8 @@ function GenSubspace(
         dflt_sweeps = Sweeps(sweep_num)
         maxdim!(dflt_sweeps,mps_maxdim)
         mindim!(dflt_sweeps,mps_maxdim)
+        maxdim!(dflt_sweeps,6)
+        mindim!(dflt_sweeps,6)
         #cutoff!(dflt_sweeps,mps_tol)
         setnoise!(dflt_sweeps, sweep_noise...)
     end
@@ -114,23 +116,32 @@ function GenSubspace(
     
     #opsum = GenOpSum(chem_data, init_ord)
     if uhf
-        opsum = UHFOpSum(chem_data, init_ord);
+        opsum = GenOpSumSporb(chem_data, init_ord);
     else
         opsum = OpSum(chem_data, init_ord);
     end
     H_mpo = MPO(opsum, sites, cutoff=ham_tol, maxdim=ham_maxdim)
     
     verbose && println("Done making MPO hamiltonian!\n")
-    display(H_mpo)
+
     verbose && println("\nGenerating Hamiltonian sparse matrix:")
     
     H_tens = reduce(*, H_mpo);
     println("Matrix Reduced")
-    mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites])
+    mpo_sites = vcat([dag(p_ind) for p_ind in sites],[p_ind' for p_ind in sites]) #in/out indices
+    H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
     
+    
+<<<<<<< HEAD
     H_sparse = sparse(reshape(Array(H_tens, mpo_sites), (2^num_sites,2^num_sites)))
     # Project onto the eta-subspace to save on computation:
     eta_vec = sparse(zeros(2^num_sites))
+=======
+    # Project onto the eta-subspace to save on computation:
+
+    eta_vec = sparse(zeros(2^num_sites))
+    #selecting for bitstrings with the correct number of electrons
+>>>>>>> e589d2f (moderately functional "fermion" sitetype operational)
     for b=1:2^num_sites
         eta_vec[b] = Int(sum(digits(b-1, base=2))==chem_data.N_el)
     end
@@ -146,30 +157,31 @@ function GenSubspace(
     
     # Generate initial matrix product states:
     phi_list = MPS[]
-    hf_occ = [FillHF(init_ord[p], chem_data.N_el) for p=1:num_sites]
-    
+    hf_occ = [2,2,1,1]
+    #hf_occ = [FillHFSporb(init_ord[p], chem_data.N_el) for p=1:num_sites]
     verbose && println("\nGenerating states:")
     
     for i=1:M
         if isnothing(constructed_mps)
             push!(phi_list, randomMPS(sites, hf_occ, linkdims=mps_maxdim))
         else
+            psi0 = randomMPS(sites, hf_occ, linkdims=6)
+            constructed_mps = normalize(constructed_mps + psi0)
             push!(phi_list, constructed_mps)
+            display("Constructed MPS = $constructed_mps")
         end
     end
-    println("HF OCC below")
-    display(hf_occ)
-    display(phi_list[1])
+    
     if dmrg_init
         for i=1:M
             if ovlp_opt && i > 1
                 _, phi_list[i] = dmrg(H_mpo, phi_list[1:i-1], phi_list[i], dflt_sweeps, outputlevel=0, weight=ovlp_weight)
             else
-                _, phi_list[i] = dmrg(H_mpo, phi_list[i], dflt_sweeps, outputlevel=0)
+                _, phi_list[i] = dmrg(H_mpo, phi_list[i], dflt_sweeps, outputlevel=1)
             end
             
             if verbose
-                print("Progress: [$(i)/$(M)] \r")
+                print("DMRG Progress: [$(i)/$(M)] \r")
                 flush(stdout)
             end
         end
@@ -177,26 +189,26 @@ function GenSubspace(
     
     verbose && println("\nDone!\n")
     
-    # Initialize subspace data structure:
+    # Initialize subspace data structure - going to be used often !
     sdata = SubspaceProperties(
         chem_data,
         mparams,
         sites,
         dflt_sweeps,
-        init_ord,
+        [2,2,1,1], #init_ord,
         phi_list,
-        [eta_proj for i=1:length(phi_list)],
+        [eta_proj for i=1:length(phi_list)], #G_list
         H_mpo,
         H_sparse,
-        zeros((mparams.M,mparams.M)),
-        zeros((mparams.M,mparams.M)),
-        zeros(mparams.M),
-        zeros((mparams.M,mparams.M)),
-        0.0
+        zeros((mparams.M,mparams.M)), #H_mat
+        zeros((mparams.M,mparams.M)), #S_mat
+        zeros(mparams.M), #E
+        zeros((mparams.M,mparams.M)), #C
+        0.0 #kappa - condition number
     )
     
     # compute H, S, E, C, kappa:
-    GenSubspaceMats!(sdata)
+    GenSubspaceMats!(sdata, verbose=true)
     SolveGenEig!(sdata)
     
     verbose && DisplayEvalData(sdata)
@@ -244,9 +256,17 @@ end
 
 
 # Converts an MPS into a sparse vector:
+
 function SparseVec(phi)
-    phi_tens = reduce(*, phi);
-    phi_vec = sparse(reshape(Array(phi_tens, siteinds(phi)), (4^length(phi))))
+    phi_tens = reduce(*, phi)
+    #siteinds = siteinds(phi)
+    siteType = split(string(tags(siteinds(phi)[1])),",")
+    siteTypeName = replace(siteType[1], "\"F" => "F")
+    if siteTypeName == "Fermion"
+        phi_vec = sparse(reshape(Array(phi_tens, siteinds(phi)), (2^length(phi))))
+    else
+        phi_vec = sparse(reshape(Array(phi_tens, siteinds(phi)), (4^length(phi))))
+    end
     return phi_vec
 end
 
@@ -255,11 +275,15 @@ function GenSubspaceMats!(
         sd::SubspaceProperties;
         verbose=false
     )
-    
+    #constructs the H and S matrices for the subspace data structure.
+    #V_i = G(i)* phi_i
+    #V_j = G(j)* phi_j
+    #H_ij = <V_i|H|V_j>
+    #S_ij = <V_i|V_j>
     M = sd.mparams.M
-    
+
     for i=1:M, j=i:M
-        
+
         vec_i = sd.G_list[i] * SparseVec(sd.phi_list[i])
         vec_j = sd.G_list[j] * SparseVec(sd.phi_list[j])
         
@@ -269,7 +293,8 @@ function GenSubspaceMats!(
         sd.S_mat[j,i] = sd.S_mat[i,j]
         
     end
-    
+    display(sd.H_mat)
+    display(sd.S_mat)
 end
 
 
@@ -296,7 +321,7 @@ function SolveGenEig!(
     )
     
     if verbose
-        DisplayEvalData(sd.chem_data, sd.H_mat, sd.E, sd.C, sd.kappa)
+        DisplayEvalData(sd)
     end
     
 end
@@ -346,8 +371,9 @@ function AddStates!(
         
         sdata.mparams.M += 1
         M = sdata.mparams.M
-        
-        hf_occ = [FillHF(sdata.init_ord[p], sdata.chem_data.N_el) for p=1:sdata.chem_data.N_spt]
+
+        hf_occ = [2,2,1,1] #TEMPORARY measure 
+        #hf_occ = [FillHFSporb(sdata.init_ord[p], sdata.chem_data.N_el) for p=1:sdata.chem_data.N_spt]
         new_state = randomMPS(sdata.sites, hf_occ, linkdims=sdata.mparams.mps_maxdim)
         normalize!(new_state)
         

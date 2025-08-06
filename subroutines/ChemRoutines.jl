@@ -47,7 +47,92 @@ function Spatial2SpinOrd(spt_ord)
     return spn_ord 
 end
 
-function UHFOpSum(chem_data, ord; tol=1e-14)
+function UHFMPS(siteType, ordering, chemical_data_list, site_list; mps_maxdim=4)
+    
+   #TO CONSTRUCT THE MPS FOR A UHF BASIS. Sites can be of the type Fermion or Electron and the ordering schemes so far are HOMO_Matching and alternating. 
+   #Alternating should be equivalent to the original RHF TNQE with sites ordered in increasing energy.
+
+# obtain occupation information:
+N = chemical_data_list[1].N_spt  # total spin orbitals
+#initialize the mps
+sites = site_list
+state = Vector{String}(undef, N)
+#for use in MPSes of size 2^n
+quarter = div(N, 4)
+half = div(N, 2)
+    # Set the MPS based on some predefined order. Optimal ordering tbd
+  if siteType == "Electron"
+    if ordering == "HOMO_matching"
+     for i in 1:N
+      if i <= quarter
+        println("emp")
+        state[i] = "Emp"
+      elseif i <= 2*quarter
+        println("up")
+        state[i] = "Up"
+      elseif i <= 3*quarter
+        println("dn")
+        state[i] = "Dn"
+      else
+        println("emp")
+        state[i] = "Emp"
+      end
+     end
+    elseif ordering == "alternate"
+     for i in 1:N
+      if i <= half
+        if i % 2 == 1
+          state[i] = "Up"
+          println("up")
+        else
+          state[i] = "Dn"
+          println("dn")
+        end
+      else
+        println("emp")
+        state[i] = "Emp"
+      end
+     end
+    end
+  elseif siteType == "Fermion" 
+    if ordering == "HOMO_matching"
+     for i in 1:N
+      if i <= quarter
+        println("emp")
+        state[i] = "Emp"
+      elseif i <= 2*quarter
+        println("Occ_alpha")
+        state[i] = "Occ"
+      elseif i <= 3*quarter
+        println("Occ_beta")
+        state[i] = "Occ"
+      else
+        println("emp")
+        state[i] = "Emp"
+      end
+     end
+    elseif ordering == "alternate"
+     for i in 1:N
+      if i <= half
+        if i % 2 == 1
+          state[i] = "Occ"
+          println("Occ Alpha")
+        else
+          state[i] = "Occ"
+          println("Occ Beta")
+        end
+      else
+        println("emp")
+        state[i] = "Emp"
+      end
+     end
+    end
+  end
+  return productMPS(sites, state)
+end 
+
+
+function UHFOpSum(chem_data, ord, siteType; tol=1e-14)
     #Should be general for any ordering
     #hamiltonian information: 1 electron integrals, 2 electron integrals, number of sites
     non_zeros = 0
@@ -74,51 +159,109 @@ function UHFOpSum(chem_data, ord; tol=1e-14)
     #HOMO_matching => HOMOs in middle
 
     #adding one body terms: h_{pq} adag_p a_q
-    for p=1:N_spt, q=1:N_spt
-        cf_a = h1e_a[p,q]
-        cf_b = h1e_b[p,q]
+    if siteType == "Fermion"
+        for p=1:N_spt, q=1:N_spt
+            cf_a = h1e_a[p,q]
+            cf_b = h1e_b[p,q]
 
-        if abs(cf_a) >= tol
-            ampo += cf_a,"c†↑",alpha_indices[p],"c↑",alpha_indices[q]
-            #display("added the h1e_a electron value of " * string(cf_a) *" to sites"*string(alpha_indices[p])*" "*string(alpha_indices[q]))
-            non_zeros+=1
+            if abs(cf_a) >= tol
+                ampo += cf_a,"c†",alpha_indices[p],"c",alpha_indices[q]
+                #display("added the h1e_a electron value of " * string(cf_a) *" to sites"*string(alpha_indices[p])*" "*string(alpha_indices[q]))
+                non_zeros+=1
+            end
+
+            if abs(cf_b) >= tol
+                ampo += cf_b,"c†",beta_indices[p],"c",beta_indices[q]
+                #display("added the h1e_b electron value of " *string(cf_b) *" to sites"*string(beta_indices[p])*" "*string(beta_indices[q]))
+                non_zeros+=1
+            end
         end
+        
+        #adding two body terms: h_{pqrs} adag_p a_r adag_s a_q
+        for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
+            cf = 0.5*h2e_aa[p,q,r,s]
 
-        if abs(cf_b) >= tol
-            ampo += cf_b,"c†↓",beta_indices[p],"c↓",beta_indices[q]
-            #display("added the h1e_b electron value of " *string(cf_b) *" to sites"*string(beta_indices[p])*" "*string(beta_indices[q]))
-            non_zeros+=1
+            if q!=s && r!=p && abs(cf) >= tol
+                ampo += cf,"c†",ip,"c†",ir,"c",is,"c",iq
+            end
+            """
+            cf_aa = 0.5*h2e_aa[p,q,r,s]
+            cf_bb = 0.5*h2e_bb[p,q,r,s]
+            cf_ab = h2e_ab[p,q,r,s]
+            cf_ba = h2e_ba[p,q,r,s]
+
+            if abs(cf_aa) >= tol && p!=r && s!=q
+                ampo += cf_aa,"c†",alpha_indices[p],"c†",alpha_indices[r],"c",alpha_indices[s],"c",alpha_indices[q]
+                display("added the h2e_aa electron value of " *string(cf_aa) *" to sites "*string(alpha_indices[p])*" "*string(alpha_indices[q])*" "*string(alpha_indices[r])*" "*string(alpha_indices[s]))
+                non_zeros+=1
+            end
+            if abs(cf_bb)>=tol && p!=r && s!=q
+                ampo += cf_bb,"c†",beta_indices[p],"c†",beta_indices[r],"c",beta_indices[s],"c",beta_indices[q]
+                display("added the h2e_bb electron value of " *string(cf_bb) *" to sites "*string(beta_indices[p])*" "*string(beta_indices[q])*" "*string(beta_indices[r])*" "*string(beta_indices[s]))
+                non_zeros+=1
+            end
+            if abs(cf_ab)>=tol
+                ampo += cf_ab,"c†",alpha_indices[p],"c†",beta_indices[r],"c",beta_indices[s],"c",alpha_indices[q]
+                #display("added the h2e_ab electron value of " *string(cf_ab) *" to sites "*string(alpha_indices[p])*" "*string(beta_indices[q])*" "*string(alpha_indices[r])*" "*string(beta_indices[s]))
+                non_zeros+=1
+            end
+            
+            if abs(cf_ba)>=tol
+                #display("added the h2e_ba electron value of " *string(cf_ba) *" to sites "*string(beta_indices[p])*" "*string(alpha_indices[q])*" "*string(beta_indices[r])*" "*string(alpha_indices[s]))
+                ampo += cf_ba,"c†",beta_indices[p],"c†",alpha_indices[r],"c",alpha_indices[s],"c",beta_indices[q]
+                non_zeros+=1
+            end
+            """
         end
     end
-    
+    if siteType == "Electron"
+        for p=1:N_spt, q=1:N_spt
+            cf_a = h1e_a[p,q]
+            cf_b = h1e_b[p,q]
 
-    #adding two body terms: h_{pqrs} adag_p a_r adag_s a_q
-    for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
+            if abs(cf_a) >= tol
+                ampo += cf_a,"c†↑",alpha_indices[p],"c↑",alpha_indices[q]
+                #display("added the h1e_a electron value of " * string(cf_a) *" to sites"*string(alpha_indices[p])*" "*string(alpha_indices[q]))
+                non_zeros+=1
+            end
+
+            if abs(cf_b) >= tol
+                ampo += cf_b,"c†↓",beta_indices[p],"c↓",beta_indices[q]
+                #display("added the h1e_b electron value of " *string(cf_b) *" to sites"*string(beta_indices[p])*" "*string(beta_indices[q]))
+                non_zeros+=1
+            end
+        end
         
-        cf_aa = 0.5*h2e_aa[p,q,r,s]
-        cf_bb = 0.5*h2e_bb[p,q,r,s]
-        cf_ab = h2e_ab[p,q,r,s]
-        cf_ba = h2e_ba[p,q,r,s]
+        #adding two body terms: h_{pqrs} adag_p a_r adag_s a_q
+        for p=1:N_spt, q=1:N_spt, r=1:N_spt, s=1:N_spt
+            
+            cf_aa = 0.5*h2e_aa[p,q,r,s]
+            cf_bb = 0.5*h2e_bb[p,q,r,s]
+            cf_ab = h2e_ab[p,q,r,s]
+            cf_ba = h2e_ba[p,q,r,s]
 
-        if abs(cf_aa) >= tol
-            ampo += cf_aa,"c†↑",alpha_indices[p],"c†↑",alpha_indices[q],"c↑",alpha_indices[s],"c↑",alpha_indices[r]
-            #display("added the h2e_aa electron value of " *string(cf_aa) *" to sites "*string(alpha_indices[p])*" "*string(alpha_indices[q])*" "*string(alpha_indices[r])*" "*string(alpha_indices[s]))
-            non_zeros+=1
-        end
-        if abs(cf_bb)>=tol
-            ampo += cf_bb,"c†↓",beta_indices[p],"c†↓",beta_indices[q],"c↓",beta_indices[s],"c↓",beta_indices[r]
-            #display("added the h2e_bb electron value of " *string(cf_bb) *" to sites "*string(beta_indices[p])*" "*string(beta_indices[q])*" "*string(beta_indices[r])*" "*string(beta_indices[s]))
-            non_zeros+=1
-        end
-        if abs(cf_ab)>=tol
-            ampo += cf_ab,"c†↑",alpha_indices[p],"c†↓",beta_indices[q],"c↓",beta_indices[s],"c↑",alpha_indices[r]
-            #display("added the h2e_ab electron value of " *string(cf_ab) *" to sites "*string(alpha_indices[p])*" "*string(beta_indices[q])*" "*string(alpha_indices[r])*" "*string(beta_indices[s]))
-            non_zeros+=1
-        end
-        if abs(cf_ba)>=tol
-            #display("added the h2e_ba electron value of " *string(cf_ba) *" to sites "*string(beta_indices[p])*" "*string(alpha_indices[q])*" "*string(beta_indices[r])*" "*string(alpha_indices[s]))
-            ampo += cf_ba,"c†↓",beta_indices[p],"c†↑",alpha_indices[q],"c↑",alpha_indices[s],"c↓",beta_indices[r]
-            non_zeros+=1
+            if abs(cf_aa) >= tol
+                ampo += cf_aa,"c†↑",alpha_indices[p],"c†↑",alpha_indices[r],"c↑",alpha_indices[s],"c↑",alpha_indices[q]
+                #display("added the h2e_aa electron value of " *string(cf_aa) *" to sites "*string(alpha_indices[p])*" "*string(alpha_indices[q])*" "*string(alpha_indices[r])*" "*string(alpha_indices[s]))
+                non_zeros+=1
+            end
+            if abs(cf_bb)>=tol
+                ampo += cf_bb,"c†↓",beta_indices[p],"c†↓",beta_indices[r],"c↓",beta_indices[s],"c↓",beta_indices[q]
+                #display("added the h2e_bb electron value of " *string(cf_bb) *" to sites "*string(beta_indices[p])*" "*string(beta_indices[q])*" "*string(beta_indices[r])*" "*string(beta_indices[s]))
+                non_zeros+=1
+            end
+            if abs(cf_ab)>=tol
+                ampo += cf_ab,"c†↑",alpha_indices[p],"c†↓",beta_indices[r],"c↓",beta_indices[s],"c↑",alpha_indices[q]
+                #display("added the h2e_ab electron value of " *string(cf_ab) *" to sites "*string(alpha_indices[p])*" "*string(beta_indices[q])*" "*string(alpha_indices[r])*" "*string(beta_indices[s]))
+                non_zeros+=1
+            end
+            
+            if abs(cf_ba)>=tol
+                #display("added the h2e_ba electron value of " *string(cf_ba) *" to sites "*string(beta_indices[p])*" "*string(alpha_indices[q])*" "*string(beta_indices[r])*" "*string(alpha_indices[s]))
+                ampo += cf_ba,"c†↓",beta_indices[p],"c†↑",alpha_indices[r],"c↑",alpha_indices[s],"c↓",beta_indices[q]
+                non_zeros+=1
+            end
+            
         end
     end
     display("Number of non-zero terms in the OpSum: " * string(non_zeros))
@@ -174,9 +317,9 @@ end
 # Generate the OpSum object from the Hamiltonian coefficients:
 function GenOpSumSporb(chem_data, ord; tol=1E-12)
     
-    N_spt = chem_data.N_spt
-    h1e = chem_data.h1e
-    h2e = chem_data.h2e
+    N_spt = convert(Int64,chem_data.N_spt/2)
+    h1e = chem_data.h1e_a
+    h2e = chem_data.h2e_aa
     
     ampo = OpSum()
 

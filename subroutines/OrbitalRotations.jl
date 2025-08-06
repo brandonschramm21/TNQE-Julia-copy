@@ -83,9 +83,12 @@ end
 
 
 # Builds the rotation ITensor object between sites idx and idx+1:
-function RotationTensor(sites, idx; dim=2, rotype="fswap", theta=0.0)
+function RotationTensor(sites, idx; dim=2, rotype="fswap", theta=0.0, verbose = true)
+    dim=2
     rot_mat = RotationMatrix(dim=dim, rotype=rotype, theta=theta)
+    verbose && println("RotationTensor: $rot_mat, \ntheta=$theta, \nsites =$sites, \nidx=$idx")
     rot_array = reshape(rot_mat, (dim,dim,dim,dim))
+    #eeks
     rot_tens = ITensor(rot_array, dag(sites[idx]),dag(sites[idx+1]),sites[idx]',sites[idx+1]')
     return rot_tens
 end
@@ -96,7 +99,8 @@ end
 function TestFSWAP2(T, linds, maxdim; crit="fidelity")
     
     site_inds = inds(T, tags="Site")
-    fswap = RotationTensor(site_inds, 1; dim=4, rotype="fswap");
+    #eeks
+    fswap = RotationTensor(site_inds, 1; dim=2, rotype="fswap");
     
     do_comp = true
     do_swap = false

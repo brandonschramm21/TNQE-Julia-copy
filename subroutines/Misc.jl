@@ -26,6 +26,7 @@ function DisplayEvalData(sdata)
     println("Minimum eigenvalue: ", minimum(filter(!isnan,real.(E))))
     println("Condition number: ", kappa)
 
+    #println("Hartree-Fock energy: ", chemical_data.e_xhf)
     println("FCI energy: ", chemical_data.e_fci)
     println("Final energy estimate: ", e_gnd)
     println("Best single ref. estimate: ", e_bsrf)

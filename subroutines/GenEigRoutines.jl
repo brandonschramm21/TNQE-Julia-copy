@@ -1,5 +1,5 @@
 # Functions for solving the generalized eigenvalue problem
-
+using ITensorMPS
 
 # Solve the generalized eigenvalue problem HC = SCE with a given thresholding procedure:
 function SolveGenEig(H_in, S_in; thresh="none", eps=1e-12, force_posdef=false)
@@ -35,11 +35,11 @@ function SolveGenEig(H_in, S_in; thresh="none", eps=1e-12, force_posdef=false)
         kappa = cond(S)
         
     elseif thresh=="projection"
-        
         # Projection-based thresholding:
         F = svd(S)
         t = sum(F.S .> eps)
         
+        #extract the first t singular vectors from the U matrix
         U = F.U[:,1:t]
 
         H_thresh = transpose(conj(U)) * H * U
@@ -55,6 +55,7 @@ function SolveGenEig(H_in, S_in; thresh="none", eps=1e-12, force_posdef=false)
         E[1:t] = real.(E_thresh)
         
         C = zeros(Float64, M, M)
+        #update first t columns of C with the eigenvectors
         C[:,1:t] = real.(U * C_thresh)
         
         for i=1:t
